@@ -1,0 +1,1 @@
+"""SkillPlus application package."""

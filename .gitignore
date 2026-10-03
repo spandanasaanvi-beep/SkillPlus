@@ -1,0 +1,15 @@
+node_modules/
+frontend/node_modules/
+frontend/dist/
+backend/.venv/
+backend/__pycache__/
+backend/.pytest_cache/
+backend/.env
+frontend/.env
+.DS_Store
+*.pyc
+*.sqlite3
+
+*.db
+*.swp
+*.tsbuildinfo
