@@ -1,12 +1,21 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getDistricts, getProfile, getSectors, getStates, getTrades, updateProfile } from '../services/api';
+import SearchableSelect from '../components/SearchableSelect';
+import {
+  getDistrictOptions,
+  preferredJobOptions,
+  preferredStateOptions,
+  qualificationOptions,
+  sectorOptions,
+  skillOptions,
+} from '../data/profileOptions';
+import { getProfile, updateProfile } from '../services/api';
 
 type ProfileForm = {
   name: string;
   qualification: string;
-  skills: string;
+  skills: string[];
   preferredJob: string;
   sector: string;
   state: string;
@@ -18,17 +27,13 @@ export default function OnboardingPage() {
   const [profile, setProfile] = useState<ProfileForm>({
     name: '',
     qualification: '',
-    skills: '',
+    skills: [],
     preferredJob: '',
     sector: '',
     state: '',
     district: '',
   });
-  const [states, setStates] = useState<string[]>([]);
-  const [districts, setDistricts] = useState<string[]>([]);
-  const [sectors, setSectors] = useState<string[]>([]);
-  const [trades, setTrades] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const districts = getDistrictOptions(profile.state);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -37,36 +42,13 @@ export default function OnboardingPage() {
       navigate('/dashboard');
       return;
     }
-
-    Promise.all([getStates(), getSectors(), getTrades()]).then(([stateList, sectorList, tradeList]) => {
-      setStates(stateList);
-      setSectors(sectorList);
-      setTrades(tradeList);
-      setLoading(false);
-    }).catch(() => {
-      setLoading(false);
-    });
   }, [navigate]);
-
-  useEffect(() => {
-    if (!profile.state) {
-      setDistricts([]);
-      return;
-    }
-
-    getDistricts(profile.state).then((stateDistricts) => {
-      setDistricts(stateDistricts);
-      if (profile.district && !stateDistricts.includes(profile.district)) {
-        setProfile((current) => ({ ...current, district: '' }));
-      }
-    }).catch(() => setDistricts([]));
-  }, [profile.state]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const cleaned = { ...profile, name: profile.name.trim(), preferredJob: profile.preferredJob.trim(), skills: profile.skills.trim() };
+    const cleaned = { ...profile, name: profile.name.trim(), preferredJob: profile.preferredJob.trim() };
 
-    if (!cleaned.name || !cleaned.qualification || !cleaned.skills || !cleaned.preferredJob || !cleaned.sector || !cleaned.state || !cleaned.district) {
+    if (!cleaned.name || !cleaned.qualification || cleaned.skills.length === 0 || !cleaned.preferredJob || !cleaned.sector || !cleaned.state || !cleaned.district) {
       setError('Please complete all onboarding fields before continuing.');
       return;
     }
@@ -74,7 +56,7 @@ export default function OnboardingPage() {
     const payload = {
       name: cleaned.name,
       qualification: cleaned.qualification,
-      skills: cleaned.skills.split(',').map((skill) => skill.trim()).filter(Boolean),
+      skills: cleaned.skills,
       preferredJob: cleaned.preferredJob,
       sector: cleaned.sector,
       state: cleaned.state,
@@ -104,34 +86,39 @@ export default function OnboardingPage() {
 
                 <label className="text-sm font-medium text-slate-700">
                   Qualification
-                  <input
+                  <select
                     required
                     value={profile.qualification}
                     onChange={(event) => setProfile((current) => ({ ...current, qualification: event.target.value }))}
-                    placeholder="Select your qualification"
                     className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
-                  />
+                  >
+                    <option value="">Select your qualification</option>
+                    {qualificationOptions.map((qualification) => <option key={qualification} value={qualification}>{qualification}</option>)}
+                  </select>
                 </label>
 
                 <label className="text-sm font-medium text-slate-700">
                   Skills
-                  <input
+                  <SearchableSelect
                     required
+                    multiple
+                    label="Skills"
+                    options={skillOptions}
                     value={profile.skills}
-                    onChange={(event) => setProfile((current) => ({ ...current, skills: event.target.value }))}
-                    placeholder="Enter your skills"
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
+                    onChange={(skills) => setProfile((current) => ({ ...current, skills }))}
+                    placeholder="Select your skills"
                   />
                 </label>
 
                 <label className="text-sm font-medium text-slate-700">
                   Preferred Job / Occupation
-                  <input
+                  <SearchableSelect
                     required
+                    label="Preferred Job / Occupation"
+                    options={preferredJobOptions}
                     value={profile.preferredJob}
-                    onChange={(event) => setProfile((current) => ({ ...current, preferredJob: event.target.value }))}
-                    placeholder="Select your preferred occupation"
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
+                    onChange={(preferredJob) => setProfile((current) => ({ ...current, preferredJob }))}
+                    placeholder="Select preferred job"
                   />
                 </label>
 
@@ -142,11 +129,10 @@ export default function OnboardingPage() {
                     value={profile.sector}
                     onChange={(event) => setProfile((current) => ({ ...current, sector: event.target.value }))}
                     className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
-                    disabled={loading || sectors.length === 0}
                   >
                     <option value="">Select your preferred sector</option>
-                    {sectors.map((sector) => (
-                      <option key={sector} value={sector}>{sector}</option>
+                    {sectorOptions.map(({ label, value }) => (
+                      <option key={value} value={value}>{label}</option>
                     ))}
                   </select>
                 </label>
@@ -158,10 +144,9 @@ export default function OnboardingPage() {
                     value={profile.state}
                     onChange={(event) => setProfile((current) => ({ ...current, state: event.target.value, district: '' }))}
                     className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
-                    disabled={loading || states.length === 0}
                   >
-                    <option value="">Select your state</option>
-                    {states.map((state) => (
+                    <option value="">Select preferred state</option>
+                    {preferredStateOptions.map((state) => (
                       <option key={state} value={state}>{state}</option>
                     ))}
                   </select>
@@ -174,9 +159,9 @@ export default function OnboardingPage() {
                     value={profile.district}
                     onChange={(event) => setProfile((current) => ({ ...current, district: event.target.value }))}
                     className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
-                    disabled={loading || districts.length === 0}
+                    disabled={!profile.state || districts.length === 0}
                   >
-                    <option value="">Select your district</option>
+                    <option value="">Select preferred district</option>
                     {districts.map((district) => (
                       <option key={district} value={district}>{district}</option>
                     ))}
@@ -184,7 +169,7 @@ export default function OnboardingPage() {
                 </label>
               </div>
 
-              {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
+              {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
 
               <div className="flex items-center justify-end pt-2">
                 <button
